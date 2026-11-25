@@ -20,15 +20,16 @@ export function runUiChecks(app,catalogue,createShell,check) {
  const output=()=>$('output').children.map(el=>el.textContent).join('\n');
  const select=i=>$('missions').children[i].trigger('click');
  launch();
- check($('solved').textContent==='0 / 10','initial score');
- check($('missions').children.length===10,'mission count');
+ check($('solved').textContent==='0 / '+catalogue().length,'initial score');
+ check($('missions').children.length===catalogue().length,'mission count');
+ $('search').value='Packet';$('search').trigger('input');check($('missions').children.length===1,'search');$('search').value='';$('difficulty').value='Beginner';$('difficulty').trigger('change');check($('missions').children.length===catalogue().filter(m=>m.level==='Beginner').length,'difficulty');$('difficulty').value='all';$('difficulty').trigger('change');$('bookmark').trigger('click');$('mission-filter').value='bookmarked';$('mission-filter').trigger('change');check($('missions').children.length===1,'bookmark filter');$('mission-filter').value='all';$('mission-filter').trigger('change');$('notes').value='Evidence note';$('notes').trigger('input');$('large-text').trigger('click');check($('output').className==='large-text','large text');$('dismiss-tutorial').trigger('click');check($('tutorial').hidden,'dismiss tutorial');$('show-tutorial').trigger('click');check(!$('tutorial').hidden,'show tutorial');$('next').trigger('click');check($('mission-title').textContent==='Ghost Process','next case');$('previous').trigger('click');check($('notes').value==='Evidence note','per-case note');launch();check($('notes').value==='Evidence note'&&$('output').className==='large-text','persist note and text');$('restart').trigger('click');check($('notes').value==='Evidence note','restart preserves notes');
  cmd('ls -a');check(output().includes('.message'),'hidden file');
- cmd('submit wrong');check(output().includes('Flag rejected'),'incorrect flag');
+ cmd('submit wrong');check(output().includes('Flag rejected'),'incorrect flag');check($('attempt-count').textContent==='1','wrong flag stat');check(Number($('command-count').textContent)>=2,'command stat');
  $('hint').trigger('click');check(output().includes('HINT 1'),'hint');
- $('hint').trigger('click');check($('hint').disabled,'hint limit');
+ $('hint').trigger('click');check($('hint').disabled,'hint limit');$('clear').trigger('click');$('repeat-hints').trigger('click');check(output().includes('HINT 1')&&output().includes('HINT 2'),'review hints');check($('hint-total').textContent==='2','hint stat');
  cmd('submit T404{first_contact}');check($('score').textContent==='0050','hint score');
  cmd('submit T404{first_contact}');check($('score').textContent==='0050','no duplicate score');
- check($('solved').textContent==='1 / 10','solved count');
+ check($('solved').textContent==='1 / '+catalogue().length,'solved count');check($('achievements').textContent.includes('First flag'),'achievement');check($('lesson').textContent.length>0,'lesson');$('mission-filter').value='solved';$('mission-filter').trigger('change');check($('missions').children.length===1,'solved filter');$('mission-filter').value='all';$('mission-filter').trigger('change');
  select(1);cmd('cd /var/log');check($('prompt').textContent.includes('/var/log'),'prompt update');
  cmd('grep ANOMALY system.log');check(output().includes('T404{ghost_process}'),'relative file');
  $('command').trigger('keydown',{key:'ArrowUp'});check($('command').value==='grep ANOMALY system.log','history up');
@@ -41,9 +42,9 @@ export function runUiChecks(app,catalogue,createShell,check) {
  allowReset=false;$('reset').trigger('click');check($('score').textContent==='0200','cancel reset');
  allowReset=true;$('reset').trigger('click');check($('score').textContent==='0000','reset');
  const all=catalogue();for(let i=0;i<all.length;i++){select(i);for(const c of all[i].route)cmd(c);cmd('submit '+all[i].flag);}
- check($('solved').textContent==='10 / 10','complete all');check($('score').textContent===String(all.reduce((s,m)=>s+m.points,0)),'total score');
+ check($('solved').textContent===catalogue().length+' / '+catalogue().length,'complete all');check($('score').textContent===String(all.reduce((s,m)=>s+m.points,0)),'total score');
  check($('rank').textContent==='Elite investigator','final rank');check(output().includes('ALL CASES SOLVED'),'completion message');
- store.set('terminal404.v1','{bad');launch();check($('solved').textContent==='0 / 10','invalid saved JSON');
- store.set('terminal404.v1',JSON.stringify({solved:{'01':99},hints:{'01':0},active:'invalid'}));launch();check($('solved').textContent==='0 / 10','invalid saved score');
+ store.set('terminal404.v1','{bad');launch();check($('solved').textContent==='0 / '+catalogue().length,'invalid saved JSON');
+ store.set('terminal404.v1',JSON.stringify({solved:{'01':99},hints:{'01':0},active:'invalid'}));launch();check($('solved').textContent==='0 / '+catalogue().length,'invalid saved score');
  blocked=true;launch();check($('storage-status').textContent.includes('Storage unavailable'),'blocked storage');cmd('ls');check(output().includes('README.txt'),'blocked storage gameplay');
 }
