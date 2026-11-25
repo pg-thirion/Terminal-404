@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {catalogue} from '../engine.js';
-const base='/Terminal-404/';
+const base='/';
 async function command(page,cmd){await page.locator('#command').fill(cmd);await page.locator('#command').press('Enter');}
 test('full mission lifecycle, scoring, reload and reset',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));

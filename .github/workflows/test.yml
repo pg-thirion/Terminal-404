@@ -1,4 +1,4 @@
-name: Test and publish
+name: Test
 on:
   push:
     branches: [main]
@@ -17,43 +17,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm test
-      - name: Prepare exact production site
-        run: |
-          mkdir -p .site/Terminal-404
-          cp index.html style.css app.js engine.js favicon.svg .site/Terminal-404/
+      - run: npm run build
       - name: Install browser test tools
         run: |
           npm install --no-save --package-lock=false @playwright/test@1.56.1
           npx playwright install --with-deps chromium firefox webkit
       - run: npx playwright test
-      - name: Upload Pages artifact
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .site/Terminal-404
-  deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    needs: test
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      pages: write
-      id-token: write
-    concurrency:
-      group: github-pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/configure-pages@v5
-      - name: Publish verified site
-        id: deployment
-        uses: actions/deploy-pages@v4
-      - name: Smoke check published site
-        env:
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-        run: |
-          curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors --max-time 20 "${PAGE_URL}" | grep -F 'Terminal 404'
-          curl --fail --silent --show-error --max-time 20 "${PAGE_URL%/}/engine.js" | grep -F 'export function createShell'

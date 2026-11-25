@@ -24,10 +24,8 @@ Open http://localhost:8080. No API keys or backend are required. Deploy the repo
 
 ## Testing
 
-`npm test` runs the Node test suite, including intended solution paths for every mission, shell parsing and isolation checks. GitHub Actions runs tests on pushes and pull requests. The CI pipeline also runs nine real-browser end-to-end tests across Chromium, Firefox and WebKit, serving the same project-subpath files that are deployed. The DOM-handler suite checks game progression, scoring, persistence, reset and storage failures without needing a browser.
+`npm test` runs the Node test suite, including intended solution paths for every mission, shell parsing and isolation checks. GitHub Actions runs tests on pushes and pull requests. The CI pipeline also runs nine real-browser end-to-end tests across Chromium, Firefox and WebKit, serving the same runtime files that are deployed. The DOM-handler suite checks game progression, scoring, persistence, reset and storage failures without needing a browser.
 
-## GitHub Pages
+## Vercel
 
-Under Settings > Pages, set Source to GitHub Actions once. The Test and publish workflow runs the Node and browser suites before publishing the static runtime files. The workflow checks the resulting public URL after deployment. To rerun, use the Actions tab and Run workflow. The expected project URL is https://pg-thirion.github.io/Terminal-404/.
-
-The runtime remains dependency-free. Playwright is installed only in CI for browser testing. Total available points: 2700.
+The project uses Vercel static hosting. The production build runs the Node test suite and copies only the five runtime assets into dist. Security headers are configured in vercel.json. GitHub Actions independently tests Chromium, Firefox and WebKit. No runtime dependencies or environment variables are needed.
