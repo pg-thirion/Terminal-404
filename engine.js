@@ -1,0 +1,61 @@
+export function catalogue(){
+ const h="/home/agent/", v="/var/log/";
+ return [
+ {id:"01",name:"First Contact",type:"Discovery",level:"Beginner",points:100,brief:"A departing analyst left a message somewhere in your home directory. Locate the hidden file.",flag:"T404{first_contact}",files:{[h+"README.txt"]:"Welcome, agent. Not every file is visible by default.",[h+".message"]:"T404{first_contact}"},hints:["Try listing all files, including hidden ones.","Use ls -a, then cat .message."],route:["ls -a","cat .message"]},
+ {id:"02",name:"Ghost Process",type:"Log analysis",level:"Beginner",points:150,brief:"The monitoring service recorded an unusual event. Find the line labelled ANOMALY.",flag:"T404{ghost_process}",files:{[h+"brief.txt"]:"Inspect /var/log/system.log.",[v+"system.log"]:"08:01 INFO startup\n08:12 INFO heartbeat\n08:14 ANOMALY T404{ghost_process}\n08:15 INFO shutdown"},hints:["grep can filter lines in a file.","grep ANOMALY /var/log/system.log"],route:["grep ANOMALY /var/log/system.log"]},
+ {id:"03",name:"Signal Lost",type:"Encoding",level:"Beginner",points:150,brief:"An intercepted transmission is encoded in Base64. Decode the payload.",flag:"T404{signal}",files:{[h+"signal.b64"]:"VDQwNHtzaWduYWx9",[h+"note.txt"]:"Transport: Base64. The message is not encrypted."},hints:["Use base64 with the decode option.","base64 -d signal.b64"],route:["base64 -d signal.b64"]},
+ {id:"04",name:"Deep Storage",type:"Filesystem",level:"Beginner",points:200,brief:"A backup contains a file called recovery.key. Locate it in the archive.",flag:"T404{deep_storage}",files:{[h+"archive/2024/notes.txt"]:"Old backup.",[h+"archive/2025/old/notes.txt"]:"Nothing here.",[h+"archive/2026/restricted/recovery.key"]:"T404{deep_storage}"},hints:["find searches recursively.","find . -name recovery.key"],route:["find . -name recovery.key","cat archive/2026/restricted/recovery.key"]},
+ {id:"05",name:"Hex Relay",type:"Encoding",level:"Intermediate",points:250,brief:"The relay exported a message as hexadecimal bytes. Recover its readable contents.",flag:"T404{hex_relay}",files:{[h+"relay.hex"]:"543430347b6865785f72656c61797d",[h+"format.txt"]:"Raw hex, no offsets."},hints:["xxd reverses a hexadecimal dump.","xxd -r -p relay.hex"],route:["xxd -r -p relay.hex"]},
+ {id:"06",name:"Cold Evidence",type:"Forensics",level:"Intermediate",points:300,brief:"A fictional memory image contains a readable flag among binary noise. Extract printable strings.",flag:"T404{cold_evidence}",files:{[h+"memory.bin"]:"\u0000\u0001\u0002HEADER\u0000\u0003T404{cold_evidence}\u0000\u0001FOOTER",[h+"notes.txt"]:"The image is a simulated binary file."},hints:["strings extracts printable sequences.","strings memory.bin"],route:["strings memory.bin"]},
+ {id:"07",name:"Mirror Room",type:"Encoding",level:"Intermediate",points:300,brief:"A message was written backwards and then transformed using ROT13. Undo both steps.",flag:"T404{mirror_room}",files:{[h+"mirror.txt"]:"}zbbe_ebe evz{404G".replace(" ",""),[h+"method.txt"]:"Reverse first, then rotate letters by 13."},hints:["Pipe one command into another using |.","rev mirror.txt | rot13"],route:["rev mirror.txt | rot13"]},
+ {id:"08",name:"Audit Trail",type:"Log analysis",level:"Intermediate",points:350,brief:"Find the account associated with a successful fictional login after multiple failures. Its evidence file is named after the account.",flag:"T404{audit_trail}",files:{[v+"auth.log"]:"09:00 FAIL guest\n09:01 FAIL guest\n09:02 FAIL oracle\n09:03 SUCCESS oracle\n09:04 FAIL backup",[h+"evidence/guest.txt"]:"No evidence.",[h+"evidence/backup.txt"]:"No evidence.",[h+"evidence/oracle.txt"]:"T404{audit_trail}"},hints:["Filter auth.log for SUCCESS.","Read evidence/oracle.txt."],route:["grep SUCCESS /var/log/auth.log","cat evidence/oracle.txt"]},
+ {id:"09",name:"Duplicate Shadow",type:"Data analysis",level:"Advanced",points:400,brief:"A list contains duplicate decoys and one unique encoded message. Isolate the unique line and decode it.",flag:"T404{unique}",files:{[h+"queue.txt"]:"bm9pc2U=\nZGVjb3k=\nVDQwNHt1bmlxdWV9\nbm9pc2U=\nZGVjb3k="},hints:["sort puts duplicate lines together. uniq -u removes duplicates.","sort queue.txt | uniq -u | base64 -d"],route:["sort queue.txt | uniq -u | base64 -d"]},
+ {id:"10",name:"Terminal 404",type:"Final investigation",level:"Advanced",points:500,brief:"Follow the analyst's final breadcrumb, locate the hidden archive and decode its two-layer message.",flag:"T404{final_access}",files:{[h+"case.txt"]:"The final lead is in /var/log/relay.log. Search for HANDOFF.",[v+"relay.log"]:"INFO online\nHANDOFF /home/agent/.vault/packet.hex\nINFO offline",[h+".vault/packet.hex"]:"564451774e48746d615735686246396859324e6c63334e395",[h+".vault/format.txt"]:"Hex transport wraps a Base64 message."},hints:["grep HANDOFF /var/log/relay.log","xxd -r -p .vault/packet.hex | base64 -d"],route:["grep HANDOFF /var/log/relay.log","xxd -r -p .vault/packet.hex | base64 -d"]}
+ ].map(m=>{if(m.id==="07")m.files[h+"mirror.txt"]=[...m.flag.replace(/[a-z]/gi,c=>String.fromCharCode((c.charCodeAt(0)-(c<="Z"?65:97)+13)%26+(c<="Z"?65:97)))].reverse().join("");if(m.id==="10")m.files[h+".vault/packet.hex"]="VDQwNHtmaW5hbF9hY2Nlc3N9".split("").map(c=>c.charCodeAt(0).toString(16).padStart(2,"0")).join("");return m;});
+}
+
+export function createShell(mission){
+ const files=new Map(Object.entries(mission.files)), dirs=new Set(["/","/home","/home/agent","/var","/var/log"]);
+ for(const p of files.keys()){let x=p;while(x.includes("/")){x=x.slice(0,x.lastIndexOf("/"))||"/";dirs.add(x);if(x==="/")break;}}
+ let cwd="/home/agent", history=[];
+ const norm=p=>{const s=(p||".").replace(/^~(?=\/|$)/,"/home/agent");const parts=(s.startsWith("/")?s:cwd+"/"+s).split("/"), out=[];for(const t of parts){if(t==="..")out.pop();else if(t&&t!==".")out.push(t);}return "/"+out.join("/");};
+ const read=p=>{const n=norm(p);if(!files.has(n))throw Error("No such file: "+p);return files.get(n);};
+ const lines=s=>s===""?[]:s.replace(/\n$/,"").split("\n");
+ const decode=s=>{const a="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", t=s.replace(/\s/g,"");if(!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(t))throw Error("Invalid Base64 input");let out="",bits=0,n=0;for(const c of t.replace(/=+$/,"")){n=(n<<6)|a.indexOf(c);bits+=6;if(bits>=8){bits-=8;out+=String.fromCharCode((n>>bits)&255);}}return out;};
+ function parse(s){let parts=[[]],word="",quote="",active=false;const flush=()=>{if(active){parts.at(-1).push(word);word="";active=false;}};for(let i=0;i<s.length;i++){const c=s[i];if(c==="\\"&&quote!=="'"){if(++i>=s.length)throw Error("Incomplete escape");word+=s[i];active=true;}else if(quote){if(c===quote)quote="";else word+=c;active=true;}else if(c==="'"||c==='"'){quote=c;active=true;}else if(c==="|"){flush();parts.push([]);}else if(/\s/.test(c)){flush();}else{word+=c;active=true;}}if(quote)throw Error("Unclosed quote");flush();if(parts.some(p=>!p.length))throw Error("Empty command");return parts;}
+ const commands=["help","ls","cd","pwd","cat","grep","find","strings","base64","xxd","rev","rot13","sort","uniq","head","tail","wc","file","stat","echo","history","whoami","clear"];
+ function run(input){
+  if(!input.trim())return {text:"",ok:true};if(input.length>1024)return {text:"Command too long",ok:false};history.push(input);if(history.length>100)history.shift();
+  try{let pipe=null;const stages=parse(input);if(stages.length>12)throw Error("Pipeline too long");
+   for(const [cmd,...args] of stages){
+    const source=(a=args)=>a.length?a.map(read).join("\n"):pipe===null?(()=>{throw Error("Specify a file or pipe input");})():pipe;
+    let out="";
+    switch(cmd){
+    case "help":out="Commands: "+commands.join(", ")+"\nGame: submit T404{...}, hint, missions, clear\nUse | to pipe output. Paths support ., .. and ~.\nExamples: ls -la; cat file.txt; grep word file.txt; find . -name '*.txt'";break;
+    case "pwd":out=cwd;break;
+    case "whoami":out="agent";break;
+    case "history":out=history.map((s,i)=>`${i+1}  ${s}`).join("\n");break;
+    case "clear":if(stages.length!==1)throw Error("clear cannot be piped");return {text:"",ok:true,clear:true};
+    case "cd":if(stages.length!==1)throw Error("cd cannot be piped");{const n=norm(args[0]||"~");if(!dirs.has(n))throw Error("Not a directory: "+n);cwd=n;}break;
+    case "ls":{const opts=args.filter(a=>a.startsWith("-")).join(""), p=norm(args.find(a=>!a.startsWith("-"))||".");if(files.has(p)){out=p.split("/").at(-1);break;}if(!dirs.has(p))throw Error("No such directory: "+p);const prefix=p==="/"?"/":p+"/";out=[...dirs,...files.keys()].filter(x=>x.startsWith(prefix)&&x!==p&&x.slice(prefix.length)&&!x.slice(prefix.length).includes("/")).filter(x=>opts.includes("a")||!x.slice(prefix.length).startsWith(".")).sort().map(x=>opts.includes("l")?(dirs.has(x)?"dr-xr-xr-x":"-r--r--r--")+"  agent  "+x.slice(prefix.length)+(dirs.has(x)?"/":""):x.slice(prefix.length)+(dirs.has(x)?"/":"")).join("\n");break;}
+    case "cat":out=source();break;
+    case "echo":out=args.join(" ");break;
+    case "grep":{const flags=args.filter(a=>/^-[inv]+$/.test(a)).join(""), a=args.filter(a=>!/^-[inv]+$/.test(a));if(!a.length)throw Error("Usage: grep [-inv] pattern [file]");const pattern=flags.includes("i")?a[0].toLowerCase():a[0];out=lines(source(a.slice(1))).map((l,i)=>({l,i})).filter(({l})=>(flags.includes("i")?l.toLowerCase():l).includes(pattern)!==flags.includes("v")).map(({l,i})=>flags.includes("n")?`${i+1}:${l}`:l).join("\n");break;}
+    case "find":{const root=norm(args[0]&&args[0]!=="-name"?args[0]:".");if(!dirs.has(root)&&!files.has(root))throw Error("No such path: "+root);const i=args.indexOf("-name"), glob=i<0?"*":args[i+1];if(!glob)throw Error("Missing name pattern");const regex=new RegExp("^"+glob.split("*").map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join(".*")+"$");out=[...dirs,...files.keys()].filter(x=>(x===root||x.startsWith(root==="/"?"/":root+"/"))&&regex.test(x.split("/").at(-1))).sort().join("\n");break;}
+    case "strings":out=(source().match(/[\x20-\x7e]{4,}/g)||[]).join("\n");break;
+    case "base64":if(!args.includes("-d")&&!args.includes("--decode"))throw Error("Usage: base64 -d [file]");out=decode(source(args.filter(a=>a!=="-d"&&a!=="--decode")));break;
+    case "xxd":if(!args.includes("-r")||!args.includes("-p"))throw Error("Usage: xxd -r -p [file]");{const s=source(args.filter(a=>a!=="-r"&&a!=="-p")).replace(/\s/g,"");if(!/^(?:[0-9a-f]{2})*$/i.test(s))throw Error("Invalid hex");out=(s.match(/../g)||[]).map(x=>String.fromCharCode(parseInt(x,16))).join("");}break;
+    case "rev":out=lines(source()).map(s=>[...s].reverse().join("")).join("\n");break;
+    case "rot13":out=source().replace(/[a-z]/gi,c=>{const b=c<="Z"?65:97;return String.fromCharCode((c.charCodeAt(0)-b+13)%26+b);});break;
+    case "sort":out=lines(source()).sort().join("\n");break;
+    case "uniq":{const a=lines(source(args.filter(x=>x!=="-u"&&x!=="-c")));const groups=[];for(const l of a){if(groups.at(-1)?.line===l)groups.at(-1).n++;else groups.push({line:l,n:1});}out=groups.filter(g=>!args.includes("-u")||g.n===1).map(g=>args.includes("-c")?`${g.n} ${g.line}`:g.line).join("\n");break;}
+    case "head":case "tail":{let a=[...args],n=10;if(a[0]==="-n"){a.shift();n=Number(a.shift());if(!Number.isInteger(n)||n<0||n>10000)throw Error("Invalid line count");}const l=lines(source(a));out=(cmd==="head"?l.slice(0,n):n?l.slice(-n):[]).join("\n");break;}
+    case "wc":{const a=source(args.filter(x=>x!=="-l"&&x!=="-w"&&x!=="-c"));out=args.includes("-l")?String(lines(a).length):args.includes("-w")?String(a.trim()?a.trim().split(/\s+/).length:0):args.includes("-c")?String(a.length):`${lines(a).length} ${a.trim()?a.trim().split(/\s+/).length:0} ${a.length}`;break;}
+    case "file":case "stat":{if(!args.length)throw Error("Specify a path");out=args.map(p=>{const n=norm(p);if(dirs.has(n))return `${p}: directory`;const d=read(p);return cmd==="stat"?`${p}: ${d.length} bytes (virtual, read-only)`:`${p}: ${/[\x00-\x08]/.test(d)?"binary data":"ASCII text"}`;}).join("\n");break;}
+    default:throw Error(`Command not found: ${cmd}. Type help.`);
+    }pipe=out;
+   }return {text:pipe||"",ok:true};
+  }catch(e){return {text:e.message,ok:false};}
+ }
+ return {run,get cwd(){return cwd;},commands};
+}
