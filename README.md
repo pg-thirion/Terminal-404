@@ -1,5 +1,7 @@
 # Terminal 404
 
+**[Play Terminal 404 live on Vercel](https://terminal-404-indol.vercel.app)**
+
 A dependency-free browser CTF game with eighteen fictional cybersecurity missions, a virtual read-only Linux filesystem, simulated shell pipelines, hints, scores and local progress.
 
 ## Run
