@@ -23,25 +23,37 @@ export function createShell(mission){
  const lines=s=>s===""?[]:s.replace(/\n$/,"").split("\n");
  const decode=s=>{const a="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", t=s.replace(/\s/g,"");if(!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(t))throw Error("Invalid Base64 input");let out="",bits=0,n=0;for(const c of t.replace(/=+$/,"")){n=(n<<6)|a.indexOf(c);bits+=6;if(bits>=8){bits-=8;out+=String.fromCharCode((n>>bits)&255);}}return out;};
  function parse(s){let parts=[[]],word="",quote="",active=false;const flush=()=>{if(active){parts.at(-1).push(word);word="";active=false;}};for(let i=0;i<s.length;i++){const c=s[i];if(c==="\\"&&quote!=="'"){if(++i>=s.length)throw Error("Incomplete escape");word+=s[i];active=true;}else if(quote){if(c===quote)quote="";else word+=c;active=true;}else if(c==="'"||c==='"'){quote=c;active=true;}else if(c==="|"){flush();parts.push([]);}else if(/\s/.test(c)){flush();}else{word+=c;active=true;}}if(quote)throw Error("Unclosed quote");flush();if(parts.some(p=>!p.length))throw Error("Empty command");return parts;}
+ // A wildcard matcher without user-controlled regular expressions.
+ function matchesGlob(name, pattern) {
+  let i=0,j=0,star=-1,backtrack=0;
+  while(i<name.length){
+   if(pattern[j]===name[i]){i++;j++;}
+   else if(pattern[j]==="*"){star=j++;backtrack=i;}
+   else if(star!==-1){j=star+1;i=++backtrack;}
+   else return false;
+  }
+  while(pattern[j]==="*")j++;
+  return j===pattern.length;
+ }
  const commands=["help","ls","cd","pwd","cat","grep","find","strings","base64","xxd","rev","rot13","sort","uniq","head","tail","wc","file","stat","echo","history","whoami","clear"];
  function run(input){
-  if(!input.trim())return {text:"",ok:true};if(input.length>1024)return {text:"Command too long",ok:false};history.push(input);if(history.length>100)history.shift();
+  if(typeof input!=="string")return {text:"Invalid command",ok:false};if(!input.trim())return {text:"",ok:true};if(input.length>1024)return {text:"Command too long",ok:false};history.push(input);if(history.length>100)history.shift();
   try{let pipe=null;const stages=parse(input);if(stages.length>12)throw Error("Pipeline too long");
    for(const [cmd,...args] of stages){
     const source=(a=args)=>a.length?a.map(read).join("\n"):pipe===null?(()=>{throw Error("Specify a file or pipe input");})():pipe;
     let out="";
     switch(cmd){
-    case "help":out="Commands: "+commands.join(", ")+"\nGame: submit T404{...}, hint, missions, clear\nUse | to pipe output. Paths support ., .. and ~.\nExamples: ls -la; cat file.txt; grep word file.txt; find . -name '*.txt'";break;
+    case "help":out="Commands: "+commands.join(", ")+"\nGame: submit T404{...}, hint, missions, clear\nUse | to pipe output. Paths support ., .. and ~. grep uses literal matching. find -name supports * wildcards.\nExamples (run separately): ls -la, cat file.txt, grep word file.txt, find . -name '*.txt'";break;
     case "pwd":out=cwd;break;
     case "whoami":out="agent";break;
     case "history":out=history.map((s,i)=>`${i+1}  ${s}`).join("\n");break;
     case "clear":if(stages.length!==1)throw Error("clear cannot be piped");return {text:"",ok:true,clear:true};
-    case "cd":if(stages.length!==1)throw Error("cd cannot be piped");{const n=norm(args[0]||"~");if(!dirs.has(n))throw Error("Not a directory: "+n);cwd=n;}break;
-    case "ls":{const opts=args.filter(a=>a.startsWith("-")).join(""), p=norm(args.find(a=>!a.startsWith("-"))||".");if(files.has(p)){out=p.split("/").at(-1);break;}if(!dirs.has(p))throw Error("No such directory: "+p);const prefix=p==="/"?"/":p+"/";out=[...dirs,...files.keys()].filter(x=>x.startsWith(prefix)&&x!==p&&x.slice(prefix.length)&&!x.slice(prefix.length).includes("/")).filter(x=>opts.includes("a")||!x.slice(prefix.length).startsWith(".")).sort().map(x=>opts.includes("l")?(dirs.has(x)?"dr-xr-xr-x":"-r--r--r--")+"  agent  "+x.slice(prefix.length)+(dirs.has(x)?"/":""):x.slice(prefix.length)+(dirs.has(x)?"/":"")).join("\n");break;}
+    case "cd":if(stages.length!==1)throw Error("cd cannot be piped");{const n=norm(args[0]||"~");if(args.length>1)throw Error("Usage: cd [directory]");if(!dirs.has(n))throw Error("Not a directory: "+n);cwd=n;}break;
+    case "ls":{const opts=args.filter(a=>a.startsWith("-")).join(""), paths=args.filter(a=>!a.startsWith("-"));if(!/^[-al]*$/.test(opts)||paths.length>1)throw Error("Usage: ls [-al] [path]");const p=norm(paths[0]||".");if(files.has(p)){out=p.split("/").at(-1);break;}if(!dirs.has(p))throw Error("No such directory: "+p);const prefix=p==="/"?"/":p+"/";out=[...dirs,...files.keys()].filter(x=>x.startsWith(prefix)&&x!==p&&x.slice(prefix.length)&&!x.slice(prefix.length).includes("/")).filter(x=>opts.includes("a")||!x.slice(prefix.length).startsWith(".")).sort().map(x=>opts.includes("l")?(dirs.has(x)?"dr-xr-xr-x":"-r--r--r--")+"  agent  "+x.slice(prefix.length)+(dirs.has(x)?"/":""):x.slice(prefix.length)+(dirs.has(x)?"/":"")).join("\n");break;}
     case "cat":out=source();break;
     case "echo":out=args.join(" ");break;
     case "grep":{const flags=args.filter(a=>/^-[inv]+$/.test(a)).join(""), a=args.filter(a=>!/^-[inv]+$/.test(a));if(!a.length)throw Error("Usage: grep [-inv] pattern [file]");const pattern=flags.includes("i")?a[0].toLowerCase():a[0];out=lines(source(a.slice(1))).map((l,i)=>({l,i})).filter(({l})=>(flags.includes("i")?l.toLowerCase():l).includes(pattern)!==flags.includes("v")).map(({l,i})=>flags.includes("n")?`${i+1}:${l}`:l).join("\n");break;}
-    case "find":{const root=norm(args[0]&&args[0]!=="-name"?args[0]:".");if(!dirs.has(root)&&!files.has(root))throw Error("No such path: "+root);const i=args.indexOf("-name"), glob=i<0?"*":args[i+1];if(!glob)throw Error("Missing name pattern");const regex=new RegExp("^"+glob.split("*").map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join(".*")+"$");out=[...dirs,...files.keys()].filter(x=>(x===root||x.startsWith(root==="/"?"/":root+"/"))&&regex.test(x.split("/").at(-1))).sort().join("\n");break;}
+    case "find":{const root=norm(args[0]&&args[0]!=="-name"?args[0]:".");if(!dirs.has(root)&&!files.has(root))throw Error("No such path: "+root);const i=args.indexOf("-name"), glob=i<0?"*":args[i+1];if(!glob)throw Error("Missing name pattern");out=[...dirs,...files.keys()].filter(x=>(x===root||x.startsWith(root==="/"?"/":root+"/"))&&matchesGlob(x.split("/").at(-1),glob)).sort().join("\n");break;}
     case "strings":out=(source().match(/[\x20-\x7e]{4,}/g)||[]).join("\n");break;
     case "base64":if(!args.includes("-d")&&!args.includes("--decode"))throw Error("Usage: base64 -d [file]");out=decode(source(args.filter(a=>a!=="-d"&&a!=="--decode")));break;
     case "xxd":if(!args.includes("-r")||!args.includes("-p"))throw Error("Usage: xxd -r -p [file]");{const s=source(args.filter(a=>a!=="-r"&&a!=="-p")).replace(/\s/g,"");if(!/^(?:[0-9a-f]{2})*$/i.test(s))throw Error("Invalid hex");out=(s.match(/../g)||[]).map(x=>String.fromCharCode(parseInt(x,16))).join("");}break;
